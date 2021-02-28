@@ -168,6 +168,7 @@ typedef struct TextureBinding {
     unsigned int refcnt;
     int draw_time;
     uint64_t data_hash;
+    float scale;
 } TextureBinding;
 
 typedef struct TextureKey {
@@ -356,6 +357,7 @@ typedef struct PGRAPHState {
     bool flush_pending;
     bool gl_sync_pending;
     QemuEvent gl_sync_complete;
+    unsigned int surface_scale_factor;
 } PGRAPHState;
 
 typedef struct NV2AState {
@@ -497,5 +499,7 @@ void pgraph_process_pending_downloads(NV2AState *d);
 
 void *pfifo_thread(void *arg);
 void pfifo_kick(NV2AState *d);
+void nv2a_lock_fifo(NV2AState *d);
+void nv2a_unlock_fifo(NV2AState *d);
 
 #endif

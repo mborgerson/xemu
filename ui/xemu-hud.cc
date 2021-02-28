@@ -52,6 +52,7 @@ extern "C" {
 #include "sysemu/runstate.h"
 #include "hw/xbox/mcpx/apu_debug.h"
 #include "hw/xbox/nv2a/debug.h"
+#include "hw/xbox/nv2a/nv2a.h"
 
 #undef typename
 #undef atomic_fetch_add
@@ -1752,6 +1753,11 @@ static void ShowMainMenu()
                 xemu_settings_set_int(XEMU_SETTINGS_DISPLAY_UI_SCALE, g_ui_scale);
                 xemu_settings_save();
                 g_trigger_style_update = true;
+            }
+
+            int rendering_scale = nv2a_get_surface_scale_factor() - 1;
+            if (ImGui::Combo("Rendering Scale", &rendering_scale, "1x\0" "2x\0" "3x\0" "4x\0")) {
+                nv2a_set_surface_scale_factor(rendering_scale+1);
             }
 
             if (ImGui::Combo("Scaling Mode", &scaling_mode, "Center\0Scale\0Stretch\0")) {

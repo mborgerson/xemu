@@ -690,6 +690,7 @@ static MString* psh_convert(struct PixelShader *ps)
                     NV2A_UNIMPLEMENTED("Convolution for 2D textures");
                 }
             }
+            mstring_append_fmt(vars, "pT%d.xy = texScale%d * pT%d.xy;\n", i, i, i);
             mstring_append_fmt(vars, "vec4 t%d = %s(texSamp%d, pT%d.xyw);\n",
                                i, lookup, i, i);
             break;
@@ -741,6 +742,7 @@ static MString* psh_convert(struct PixelShader *ps)
             break;
         case PS_TEXTUREMODES_BUMPENVMAP_LUM:
             assert(i >= 1);
+            /* FIXME: Scale */
             sampler_type = ps->state.rect_tex[i] ? "sampler2DRect" : "sampler2D";
             mstring_append_fmt(preflight, "uniform float bumpScale%d;\n", i);
             mstring_append_fmt(preflight, "uniform float bumpOffset%d;\n", i);
@@ -772,6 +774,7 @@ static MString* psh_convert(struct PixelShader *ps)
             break;
         case PS_TEXTUREMODES_DOT_ST:
             assert(i >= 2);
+            /* FIXME: Scale */
             sampler_type = ps->state.rect_tex[i] ? "sampler2DRect" : "sampler2D";
             mstring_append_fmt(vars, "/* PS_TEXTUREMODES_DOT_ST */\n");
             mstring_append_fmt(vars, "float dot%d = dot(pT%d.xyz, %s(t%d.rgb));\n",
@@ -867,6 +870,7 @@ static MString* psh_convert(struct PixelShader *ps)
             break;
         }
 
+        mstring_append_fmt(preflight, "uniform float texScale%d;\n", i);
         if (sampler_type != NULL) {
             mstring_append_fmt(preflight, "uniform %s texSamp%d;\n", sampler_type, i);
 
