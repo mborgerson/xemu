@@ -4704,6 +4704,78 @@ static void pgraph_download_surface_data_if_dirty(NV2AState *d,
     }
 }
 
+static void pgraph_bind_current_surface(NV2AState *d)
+{
+    PGRAPHState *pg = &d->pgraph;
+
+    if (pg->color_binding) {
+        glFramebufferTexture2D(GL_FRAMEBUFFER, pg->color_binding->gl_attachment,
+                               GL_TEXTURE_2D, pg->color_binding->gl_buffer, 0);
+    }
+
+    if (pg->zeta_binding) {
+        glFramebufferTexture2D(GL_FRAMEBUFFER, pg->zeta_binding->gl_attachment,
+                               GL_TEXTURE_2D, pg->zeta_binding->gl_buffer, 0);
+    }
+
+    if (pg->color_binding || pg->zeta_binding) {
+        assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
+               GL_FRAMEBUFFER_COMPLETE);
+    }
+}
+
+static void pgraph_download_surface_data_to_buffer(NV2AState *d,
+                                                   SurfaceBinding *surface,
+                                                   bool swizzle,
+                                                   uint8_t *pixels)
+{
+    swizzle &= surface->swizzle;
+
+    NV2A_XPRINTF(DBG_SURFACE_SYNC,
+                 "[GPU->RAM] %s (%s) surface @ %" HWADDR_PRIx
+                 " (w=%d,h=%d,p=%d,bpp=%d)\n",
+                 surface->color ? "COLOR" : "ZETA",
+                 surface->swizzle ? "sz" : "lin", surface->vram_addr,
+                 surface->width, surface->height, surface->pitch,
+                 surface->bytes_per_pixel);
+
+    /*  Bind destination surface to framebuffer */
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           0, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
+                           0, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                           GL_TEXTURE_2D, 0, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, surface->gl_attachment,
+                           GL_TEXTURE_2D, surface->gl_buffer, 0);
+
+    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+    /* Read surface into memory */
+    uint8_t *buf = pixels + surface->vram_addr;
+    if (swizzle) {
+        /* FIXME: Allocate big buffer up front and re-alloc if necessary.
+         * FIXME: Consider swizzle in shader
+         */
+        buf = (uint8_t *)g_malloc(surface->height * surface->pitch);
+    }
+    glo_readpixels(surface->gl_format, surface->gl_type,
+                   surface->bytes_per_pixel, surface->pitch, surface->width,
+                   surface->height, buf);
+    assert(glGetError() == GL_NO_ERROR);
+    if (swizzle) {
+        swizzle_rect(buf, surface->width, surface->height,
+                     pixels + surface->vram_addr, surface->pitch,
+                     surface->bytes_per_pixel);
+        g_free(buf);
+    }
+
+    /* Re-bind original framebuffer target */
+    glFramebufferTexture2D(GL_FRAMEBUFFER, surface->gl_attachment,
+                           GL_TEXTURE_2D, 0, 0);
+    pgraph_bind_current_surface(d);
+}
+
 static void pgraph_download_surface_data(NV2AState *d,
     SurfaceBinding *surface,
     bool force)
@@ -4719,80 +4791,7 @@ static void pgraph_download_surface_data(NV2AState *d,
     bool skip_download = d->pgraph.surface_scale_factor != 1; /* FIXME */
     if (!skip_download) {
 
-    PGRAPHState *pg = &d->pgraph;
-    uint8_t *data = d->vram_ptr;
-    uint8_t *buf = data + surface->vram_addr;
-
-    NV2A_XPRINTF(DBG_SURFACE_SYNC,
-                 "[GPU->RAM] %s (%s) surface @ %" HWADDR_PRIx
-                 " (w=%d,h=%d,p=%d,bpp=%d)\n",
-                 surface->color ? "COLOR" : "ZETA",
-                 surface->swizzle ? "sz" : "lin", surface->vram_addr,
-                 surface->width, surface->height, surface->pitch,
-                 surface->bytes_per_pixel);
-
-    // Bind destination surface to framebuffer
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-        GL_TEXTURE_2D, 0, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-        GL_TEXTURE_2D, 0, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
-        GL_TEXTURE_2D, 0, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,
-                           surface->gl_attachment,
-                           GL_TEXTURE_2D,
-                           surface->gl_buffer, 0);
-
-    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER)
-        == GL_FRAMEBUFFER_COMPLETE);
-
-    if (surface->swizzle) {
-        // Allocate space to swizzle surface data
-        // FIXME: Allocate big buffer up front and re-alloc if necessary.
-        // FIXME: Consider swizzle in shader
-        buf = (uint8_t*)g_malloc(surface->height * surface->pitch);
-    }
-
-    // Read surface into memory
-    glo_readpixels(surface->gl_format, surface->gl_type,
-                   surface->bytes_per_pixel, surface->pitch,
-                   surface->width, surface->height,
-                   buf);
-    assert(glGetError() == GL_NO_ERROR);
-
-    if (surface->swizzle) {
-        swizzle_rect(buf,
-                     surface->width, surface->height,
-                     data + surface->vram_addr,
-                     surface->pitch,
-                     surface->bytes_per_pixel);
-        g_free(buf);
-    }
-
-    // Re-bind original framebuffer target
-    glFramebufferTexture2D(GL_FRAMEBUFFER,
-                           surface->gl_attachment,
-                           GL_TEXTURE_2D,
-                           0, 0);
-
-    if (pg->color_binding) {
-        glFramebufferTexture2D(GL_FRAMEBUFFER,
-                               pg->color_binding->gl_attachment,
-                               GL_TEXTURE_2D,
-                               pg->color_binding->gl_buffer, 0);
-    }
-
-    if (pg->zeta_binding) {
-        glFramebufferTexture2D(GL_FRAMEBUFFER,
-                               pg->zeta_binding->gl_attachment,
-                               GL_TEXTURE_2D,
-                               pg->zeta_binding->gl_buffer, 0);
-    }
-
-    if (pg->color_binding || pg->zeta_binding) {
-        assert(glCheckFramebufferStatus(GL_FRAMEBUFFER)
-            == GL_FRAMEBUFFER_COMPLETE);
-    }
+    pgraph_download_surface_data_to_buffer(d, surface, true, d->vram_ptr);
 
     memory_region_set_client_dirty(d->vram,
                                    surface->vram_addr,
@@ -4900,18 +4899,7 @@ static void pgraph_upload_surface_data(NV2AState *d, SurfaceBinding *surface,
     // Rebind previous framebuffer binding
     glBindTexture(GL_TEXTURE_2D, last_texture_binding);
 
-    if (pg->color_binding) {
-        glFramebufferTexture2D(GL_FRAMEBUFFER, pg->color_binding->gl_attachment,
-                               GL_TEXTURE_2D, pg->color_binding->gl_buffer, 0);
-    }
-    if (pg->zeta_binding) {
-        glFramebufferTexture2D(GL_FRAMEBUFFER, pg->zeta_binding->gl_attachment,
-                               GL_TEXTURE_2D, pg->zeta_binding->gl_buffer, 0);
-    }
-    if (pg->color_binding || pg->zeta_binding) {
-        assert(glCheckFramebufferStatus(GL_FRAMEBUFFER)
-               == GL_FRAMEBUFFER_COMPLETE);
-    }
+    pgraph_bind_current_surface(d);
 }
 
 static void pgraph_update_surface_part(NV2AState *d, bool upload, bool color)
