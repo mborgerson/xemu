@@ -4727,6 +4727,7 @@ static void pgraph_bind_current_surface(NV2AState *d)
 static void pgraph_download_surface_data_to_buffer(NV2AState *d,
                                                    SurfaceBinding *surface,
                                                    bool swizzle,
+                                                   bool flip,
                                                    uint8_t *pixels)
 {
     swizzle &= surface->swizzle;
@@ -4761,7 +4762,7 @@ static void pgraph_download_surface_data_to_buffer(NV2AState *d,
     }
     glo_readpixels(surface->gl_format, surface->gl_type,
                    surface->bytes_per_pixel, surface->pitch, surface->width,
-                   surface->height, buf);
+                   surface->height, flip, buf);
     assert(glGetError() == GL_NO_ERROR);
     if (swizzle) {
         swizzle_rect(buf, surface->width, surface->height,
@@ -4776,31 +4777,27 @@ static void pgraph_download_surface_data_to_buffer(NV2AState *d,
     pgraph_bind_current_surface(d);
 }
 
-static void pgraph_download_surface_data(NV2AState *d,
-    SurfaceBinding *surface,
-    bool force)
+static void pgraph_download_surface_data(NV2AState *d, SurfaceBinding *surface,
+                                         bool force)
 {
     if (!(surface->download_pending || force)) {
         return;
     }
 
-    // FIXME: Respect write enable at last TOU?
+    /* FIXME: Respect write enable at last TOU? */
 
     nv2a_profile_inc_counter(NV2A_PROF_SURF_DOWNLOAD);
 
     bool skip_download = d->pgraph.surface_scale_factor != 1; /* FIXME */
     if (!skip_download) {
+        pgraph_download_surface_data_to_buffer(d, surface, true, true, d->vram_ptr);
 
-    pgraph_download_surface_data_to_buffer(d, surface, true, d->vram_ptr);
-
-    memory_region_set_client_dirty(d->vram,
-                                   surface->vram_addr,
-                                   surface->pitch * surface->height,
-                                   DIRTY_MEMORY_VGA);
-    memory_region_set_client_dirty(d->vram,
-                                   surface->vram_addr,
-                                   surface->pitch * surface->height,
-                                   DIRTY_MEMORY_NV2A_TEX);
+        memory_region_set_client_dirty(d->vram, surface->vram_addr,
+                                       surface->pitch * surface->height,
+                                       DIRTY_MEMORY_VGA);
+        memory_region_set_client_dirty(d->vram, surface->vram_addr,
+                                       surface->pitch * surface->height,
+                                       DIRTY_MEMORY_NV2A_TEX);
 
     } /* FIXME */
 
