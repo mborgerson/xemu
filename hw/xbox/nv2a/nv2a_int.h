@@ -358,6 +358,7 @@ typedef struct PGRAPHState {
     bool gl_sync_pending;
     QemuEvent gl_sync_complete;
     unsigned int surface_scale_factor;
+    uint8_t *scale_buf;
 } PGRAPHState;
 
 typedef struct NV2AState {
