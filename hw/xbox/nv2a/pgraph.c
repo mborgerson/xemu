@@ -2267,6 +2267,10 @@ DEF_METHOD(NV097, GET_REPORT)
                             GL_QUERY_RESULT, &gl_query_result);
         pg->zpass_pixel_count_result += gl_query_result;
     }
+
+    pg->zpass_pixel_count_result /=
+        pg->surface_scale_factor * pg->surface_scale_factor;
+
     if (pg->gl_zpass_pixel_count_query_count) {
         glDeleteQueries(pg->gl_zpass_pixel_count_query_count,
                         pg->gl_zpass_pixel_count_queries);
