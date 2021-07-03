@@ -267,7 +267,7 @@ static void nv2a_init_memory(NV2AState *d, MemoryRegion *ram)
                        pfifo_thread, d, QEMU_THREAD_JOINABLE);
 }
 
-static void nv2a_lock_fifo(NV2AState *d)
+void nv2a_lock_fifo(NV2AState *d)
 {
     qemu_mutex_lock(&d->pfifo.lock);
     qemu_cond_broadcast(&d->pfifo.fifo_cond);
@@ -277,7 +277,7 @@ static void nv2a_lock_fifo(NV2AState *d)
     qemu_mutex_lock(&d->pgraph.lock);
 }
 
-static void nv2a_unlock_fifo(NV2AState *d)
+void nv2a_unlock_fifo(NV2AState *d)
 {
     pfifo_kick(d);
     qemu_mutex_unlock(&d->pgraph.lock);
