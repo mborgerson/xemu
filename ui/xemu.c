@@ -914,6 +914,13 @@ static void sdl2_display_init(DisplayState *ds, DisplayOptions *o)
     int i;
     SDL_SysWMinfo info;
 
+    SDL_DisplayMode current;
+    // Query Window Size and Print The Display Mode
+    for(i = 0; i < SDL_GetNumVideoDisplays(); ++i){
+        int window_query = SDL_GetCurrentDisplayMode(i, &current);
+        SDL_Log("Display #%d: current display mode is %dx%dpx @ %dhz. ", i, current.w, current.h, current.refresh_rate);
+    }
+    
     assert(o->type == DISPLAY_TYPE_XEMU);
     SDL_GL_MakeCurrent(m_window, m_context);
 
