@@ -26,14 +26,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run -s scripts/bump-wrap-revisions.py
 
-      - id: diff
-        run: |
-          files=$(git diff --name-only --diff-filter=AM \
-                   | grep -E '^subprojects/.*\.wrap$' || true)
-          echo "FILES=$files" >> "$GITHUB_OUTPUT"
-
-      - name: Open pull-requests
-        if: ${{ steps.diff.outputs.FILES != '' }}
+      - name: Create PRs for any updates
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -41,7 +34,10 @@ jobs:
           git config user.name  "xemu-robot"
           git config user.email "robot@xemu.app"
 
-          for wrap in ${{ steps.diff.outputs.FILES }}; do
+          files=$(git diff --name-only --diff-filter=AM \
+                   | grep -E '^subprojects/.*\.wrap$' || true)
+
+          for wrap in $files; do
             echo "➤ Processing $wrap"
             branch="sync/bump-${wrap//\//-}-${GITHUB_RUN_ID}"
 
