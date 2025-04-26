@@ -1,6 +1,6 @@
 [wrap-git]
 url = https://github.com/KhronosGroup/glslang
-revision = vulkan-sdk-1.4.309.0
+revision = 7200bc12a8979d13b22cd52de80ffb7d41939615
 depth = 1
 
 [update]
