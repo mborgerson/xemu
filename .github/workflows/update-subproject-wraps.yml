@@ -50,7 +50,7 @@ jobs:
             branch="sync/bump-${name//\//-}-${GITHUB_RUN_ID}"
 
             git switch --quiet -c "$branch" origin/master
-            git add "$file"
+            git add "$path"
             git commit -m "meson: Bump ${name} to ${new_tag}"
             git push -u origin "$branch"
 
