@@ -1,0 +1,64 @@
+name: Update Meson wrap revisions
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    outputs:
+      changed_files: ${{ steps.diff.outputs.changed_files }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Update wrap files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run -s scripts/bump-wrap-revisions.py
+
+      - id: diff
+        run: |
+          files=$(git diff --name-only --diff-filter=AM \
+                   | grep -E '^subprojects/.*\.wrap$' || true)
+          echo "FILES=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull-requests
+        if: ${{ steps.diff.outputs.FILES != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name  "xemu-robot"
+          git config user.email "robot@xemu.app"
+
+          for wrap in ${{ steps.diff.outputs.FILES }}; do
+            echo "➤ Processing $wrap"
+            branch="sync/bump-${wrap//\//-}-${GITHUB_RUN_ID}"
+
+            # start the branch from master every time
+            git switch --quiet -c "$branch" origin/master
+
+            git add "$wrap"
+            git commit -m "meson: Bump ${wrap} revision"
+            git push -u origin "$branch"
+
+            gh pr create \
+              --title "meson: Bump ${wrap} revision" \
+              --body  "Automatic bump of \`${wrap}\` to the latest **stable** upstream commit." \
+              --label "meson-wrap, automation" \
+              --base  master
+
+            # return to a pristine master for the next iteration
+            git switch --quiet master
+            git reset --hard origin/master
+          done
