@@ -54,11 +54,9 @@ jobs:
 
             gh pr create \
               --title "meson: Bump ${wrap} revision" \
-              --body  "Automatic bump of \`${wrap}\` to the latest **stable** upstream commit." \
-              --label "meson-wrap, automation" \
+              --body  "Automatic bump of \`${wrap}\`." \
               --base  master
 
             # return to a pristine master for the next iteration
             git switch --quiet master
-            git reset --hard origin/master
           done
