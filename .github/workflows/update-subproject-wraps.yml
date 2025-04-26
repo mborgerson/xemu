@@ -10,23 +10,23 @@ permissions:
   pull-requests: write
 
 jobs:
-  bump:
+  update_wraps:
+    name: "Update Meson subproject wrap revisions"
     runs-on: ubuntu-latest
-    outputs:
-      changed_files: ${{ steps.diff.outputs.changed_files }}
-
     steps:
       - uses: actions/checkout@v4
 
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
 
       - name: Update wrap files
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run -s scripts/bump-wrap-revisions.py
 
-      - name: Create PRs for any updates
+      - name: Create PRs for updates
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -34,25 +34,21 @@ jobs:
           git config user.name  "xemu-robot"
           git config user.email "robot@xemu.app"
 
-          files=$(git diff --name-only --diff-filter=AM \
-                   | grep -E '^subprojects/.*\.wrap$' || true)
+          files=$(git diff --name-only --diff-filter=AM | grep -E '^subprojects/.*\.wrap$' || true)
 
-          for wrap in $files; do
-            echo "➤ Processing $wrap"
-            branch="sync/bump-${wrap//\//-}-${GITHUB_RUN_ID}"
+          for file in $files; do
+            file_basename=$(basename "$file")
+            name="${file_basename%%.*}"
+            echo "➤ Processing $name"
+            branch="sync/bump-${name//\//-}-${GITHUB_RUN_ID}"
 
-            # start the branch from master every time
             git switch --quiet -c "$branch" origin/master
-
-            git add "$wrap"
-            git commit -m "meson: Bump ${wrap} revision"
+            git add "$file"
+            git commit -m "meson: Bump ${name} revision"
             git push -u origin "$branch"
 
             gh pr create \
-              --title "meson: Bump ${wrap} revision" \
-              --body  "Automatic bump of \`${wrap}\`." \
+              --title "meson: Bump ${name} revision" \
+              --body  "Automatic bump of \`${name}\`." \
               --base  master
-
-            # return to a pristine master for the next iteration
-            git switch --quiet master
           done
