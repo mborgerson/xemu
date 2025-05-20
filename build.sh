@@ -36,6 +36,7 @@ package_macos() {
     dylibbundler -cd -of -b -x dist/xemu.app/Contents/MacOS/xemu \
         -d ${lib_path}/ \
         -p "@executable_path/${lib_rpath}/" \
+        -i /opt/local/lib/ \
         -s ${PWD}/macos-libs/${target_arch}/opt/local/lib/
 
     # Fixup some paths dylibbundler missed
