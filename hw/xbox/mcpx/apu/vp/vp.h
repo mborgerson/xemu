@@ -31,7 +31,8 @@
 #include "svf.h"
 #include "hrtf.h"
 
-#define NUM_VOICE_WORKERS 4
+#define NUM_VOICE_WORKERS g_config.audio.vp.num_workers
+#define MAX_VOICE_WORKERS 16
 
 typedef struct MCPXAPUState MCPXAPUState;
 
@@ -65,7 +66,7 @@ typedef struct VoiceWorker {
 
 typedef struct VoiceWorkDispatch {
     QemuMutex lock;
-    VoiceWorker workers[NUM_VOICE_WORKERS];
+    VoiceWorker workers[MAX_VOICE_WORKERS];
     bool workers_should_exit;
     QemuCond work_pending;
     uint64_t workers_pending;

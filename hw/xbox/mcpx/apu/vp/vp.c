@@ -1761,6 +1761,8 @@ static void voice_work_init(MCPXAPUState *d)
 {
     VoiceWorkDispatch *vwd = &d->vp.voice_work_dispatch;
 
+    g_config.audio.vp.num_workers = MAX(1, MIN(g_config.audio.vp.num_workers, MAX_VOICE_WORKERS));
+
     vwd->workers_should_exit = false;
     vwd->workers_pending = 0;
     vwd->queue_len = 0;
