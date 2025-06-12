@@ -31,7 +31,7 @@
 #include "svf.h"
 #include "hrtf.h"
 
-#define NUM_VOICE_WORKERS 16
+#define NUM_VOICE_WORKERS 4
 
 typedef struct MCPXAPUState MCPXAPUState;
 
