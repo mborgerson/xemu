@@ -66,7 +66,7 @@ jobs:
 
         mkdir artifact
         pushd dist
-        zip -r ../artifact/${{ matrix.artifact_name }}.zip *
+        zip -r ../artifact/${{ matrix.artifact_name }}-unsigned.zip *
         popd
 
     - name: Upload build artifact
@@ -83,32 +83,27 @@ jobs:
       matrix:
         configuration: ["debug", "release"]
     steps:
-    - name: Download x86_64 build
+    - name: Download architecture-specific builds
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
       with:
-        name: xemu-macos-x86_64-${{ matrix.configuration }}
-        path: xemu-macos-x86_64-${{ matrix.configuration }}
-    - name: Download arm64 build
-      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
-      with:
-        name: xemu-macos-arm64-${{ matrix.configuration }}
-        path: xemu-macos-arm64-${{ matrix.configuration }}
+        pattern: "xemu-macos-*-${{ matrix.configuration }}"
     - name: Build Universal bundle
       run: |
         mkdir dist
         for arch in x86_64 arm64; do
-          pushd xemu-macos-${arch}-${{ matrix.configuration }}
-          unzip xemu-macos-${arch}-${{ matrix.configuration }}-unsigned.zip
+          mkdir ${arch}
+          pushd ${arch}
+          unzip ../xemu-macos-${arch}-${{ matrix.configuration }}-unsigned.zip
           popd
           pushd dist
-          unzip -o ../xemu-macos-${arch}-${{ matrix.configuration }}/xemu-macos-${arch}-${{ matrix.configuration }}-unsigned.zip
+          unzip -o ../xemu-macos-${arch}-${{ matrix.configuration }}-unsigned.zip
           popd
         done
         pushd dist
         rm xemu.app/Contents/MacOS/xemu
         lipo -create -output xemu.app/Contents/MacOS/xemu \
-          ../xemu-macos-x86_64-${{ matrix.configuration }}/xemu.app/Contents/MacOS/xemu \
-          ../xemu-macos-arm64-${{ matrix.configuration }}/xemu.app/Contents/MacOS/xemu
+          ../x86_64/xemu.app/Contents/MacOS/xemu \
+          ../arm64/xemu.app/Contents/MacOS/xemu
         codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime --sign - xemu.app/Contents/MacOS/xemu
         zip -r ../xemu-macos-universal-${{ matrix.configuration }}-unsigned.zip *
         popd
