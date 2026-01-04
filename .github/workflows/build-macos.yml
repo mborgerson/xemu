@@ -63,17 +63,25 @@ jobs:
         ./build.sh ${{ matrix.build_param }}
         echo -e "\nCompiler Cache Stats:"
         ccache -s
+    - name: Package
+      id: package
+      run: |
+        # Determine package filename
+        version="$(cat XEMU_VERSION)"
+        if [[ "${{ matrix.configuration}}" == "Debug" ]]; then
+          version="${version}-dbg"
+        fi
+        pkg_filename="xemu-${version}-macos-${{ matrix.arch }}-unsigned.zip"
+        echo "pkg_filename=${pkg_filename}" >> $GITHUB_OUTPUT
 
-        mkdir artifact
         pushd dist
-        zip -r ../artifact/${{ matrix.artifact_name }}-unsigned.zip *
+        zip -r ../${pkg_filename} *
         popd
-
     - name: Upload build artifact
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
       with:
         name: ${{ matrix.artifact_name }}
-        path: artifact
+        path: ${{ steps.package.outputs.pkg_filename }}
 
   macos_universal:
     name: Build macOS Universal Bundle (${{ matrix.configuration }})
@@ -87,28 +95,28 @@ jobs:
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
       with:
         pattern: "xemu-macos-*-${{ matrix.configuration }}"
+        merge-multiple: true
     - name: Build Universal bundle
       run: |
         mkdir dist
-        for arch in x86_64 arm64; do
-          mkdir ${arch}
-          pushd ${arch}
-          unzip ../xemu-macos-${arch}-${{ matrix.configuration }}-unsigned.zip
-          popd
-          pushd dist
-          unzip -o ../xemu-macos-${arch}-${{ matrix.configuration }}-unsigned.zip
-          popd
-        done
         pushd dist
-        rm xemu.app/Contents/MacOS/xemu
-        lipo -create -output xemu.app/Contents/MacOS/xemu \
-          ../x86_64/xemu.app/Contents/MacOS/xemu \
-          ../arm64/xemu.app/Contents/MacOS/xemu
+        for arch in x86_64 arm64; do
+          unzip -o ../xemu-*-${arch}-unsigned.zip
+          mv xemu.app/Contents/MacOS/xemu ../xemu_${arch}
+        done
+        lipo -create -output xemu.app/Contents/MacOS/xemu ../xemu_x86_64 ../xemu_arm64
         codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime --sign - xemu.app/Contents/MacOS/xemu
-        zip -r ../xemu-macos-universal-${{ matrix.configuration }}-unsigned.zip *
+        popd
+    - name: Package
+      id: package
+      run: |
+        pkg_filename="$(ls -1 xemu-*.zip | head -n1 | sed -E 's/(.*)(arm64|x86_64)/\1universal/')"
+        echo "pkg_filename=${pkg_filename}" >> $GITHUB_OUTPUT
+        pushd dist
+        zip -r ../${pkg_filename} *
         popd
     - name: Upload build artifact
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
       with:
         name: xemu-macos-universal-${{ matrix.configuration }}
-        path: xemu-macos-universal-${{ matrix.configuration }}-unsigned.zip
+        path: ${{ steps.package.outputs.pkg_filename }}
