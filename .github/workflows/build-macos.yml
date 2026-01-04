@@ -14,22 +14,18 @@ jobs:
           configuration: Debug
           build_param: --debug -a x86_64
           artifact_name: xemu-macos-x86_64-debug
-          artifact_filename: xemu-macos-x86_64-debug-unsigned.zip
         - arch: x86_64
           configuration: Release
           build_param: -a x86_64
           artifact_name: xemu-macos-x86_64-release
-          artifact_filename: xemu-macos-x86_64-release-unsigned.zip
         - arch: arm64
           configuration: Debug
           build_param: --debug -a arm64
           artifact_name: xemu-macos-arm64-debug
-          artifact_filename: xemu-macos-arm64-debug-unsigned.zip
         - arch: arm64
           configuration: Release
           build_param: -a arm64
           artifact_name: xemu-macos-arm64-release
-          artifact_filename: xemu-macos-arm64-release-unsigned.zip
     steps:
     - name: Download source package
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
@@ -67,14 +63,17 @@ jobs:
         ./build.sh ${{ matrix.build_param }}
         echo -e "\nCompiler Cache Stats:"
         ccache -s
+
+        mkdir artifact
         pushd dist
-        zip -r ../${{ matrix.artifact_filename }} *
+        zip -r ../artifact/${{ matrix.artifact_name }}.zip *
         popd
+
     - name: Upload build artifact
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
       with:
         name: ${{ matrix.artifact_name }}
-        path: ${{ matrix.artifact_filename }}
+        path: artifact
 
   macos_universal:
     name: Build macOS Universal Bundle (${{ matrix.configuration }})
