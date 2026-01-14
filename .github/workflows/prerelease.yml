@@ -8,7 +8,7 @@ on:
 jobs:
   release:
     name: Pre-release
-    if: github.repository_owner == 'xemu-project'
+    # if: github.repository_owner == 'xemu-project'
     uses: ./.github/workflows/release.yml
     with:
       ref: ${{ github.sha }}
