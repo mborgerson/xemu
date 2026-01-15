@@ -353,10 +353,6 @@ qemu_common_flags = [
 qemu_cflags = []
 qemu_ldflags = []
 
-# Trim unreferenced functions, data
-qemu_common_flags += ['-ffunction-sections', '-fdata-sections']
-qemu_ldflags += '-Wl,--gc-sections'
-
 if host_os == 'darwin'
   # Disable attempts to use ObjectiveC features in os/object.h since they
   # won't work when we're compiling with gcc as a C compiler.
