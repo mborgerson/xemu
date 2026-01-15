@@ -42,7 +42,8 @@ jobs:
           )
         else
           opts=(
-            --extra-ldflags="-Wl,--thinlto-cache-policy=cache_size_bytes=$LTO_CACHE_MAXSIZE"
+            --extra-cflags="-ffunction-sections -fdata-sections"
+            --extra-ldflags="-Wl,--thinlto-cache-policy=cache_size_bytes=$LTO_CACHE_MAXSIZE -Wl,--gc-sections"
             -Db_lto=true
             -Db_lto_mode=thin
             -Db_thinlto_cache=true

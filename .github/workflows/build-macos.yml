@@ -62,6 +62,8 @@ jobs:
           )
         else
           opts=(
+            --extra-cflags="-ffunction-sections -fdata-sections"
+            --extra-ldflags="-Wl,-dead_strip"
             -Db_lto=true
             -Db_lto_mode=thin
             -Db_thinlto_cache=true

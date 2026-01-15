@@ -53,7 +53,9 @@ jobs:
           )
         elif [[ "${{ matrix.arch }}" == "x86_64" ]]; then
           opts=(
+            --extra-cflags="-ffunction-sections -fdata-sections"
             --extra-cflags="-flto-incremental=${LTO_CACHE_DIR} -flto-partition=cache"
+            --extra-ldflags="-Wl,--gc-sections"
             -Db_lto=true
           )
           mkdir -p ${LTO_CACHE_DIR}
