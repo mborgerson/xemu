@@ -41,7 +41,14 @@
 #include "constants.h"
 #include "glsl.h"
 
+// External memory sharing for Vulkan<->OpenGL interop
+// Disabled on macOS as it requires platform-specific extensions (VK_EXT_metal_objects)
+// that need additional implementation work
+#if defined(__APPLE__)
+#define HAVE_EXTERNAL_MEMORY 0
+#else
 #define HAVE_EXTERNAL_MEMORY 1
+#endif
 
 typedef struct QueueFamilyIndices {
     int queue_family;

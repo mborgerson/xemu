@@ -39,6 +39,30 @@ jobs:
           coreutils \
           dylibbundler
         pip install pyyaml requests
+    - name: Download and Install Vulkan SDK
+      if: matrix.arch == 'arm64'
+      env:
+        VULKAN_SDK_VERSION: "1.4.341.0"
+      run: |
+        # Download the Vulkan SDK
+        curl -L -o vulkansdk.zip \
+          "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/mac/vulkansdk-macos-${VULKAN_SDK_VERSION}.zip"
+
+        # Extract the SDK installer
+        unzip -q vulkansdk.zip
+
+        # Run the installer in unattended mode, including KosmicKrisp component
+        sudo "./vulkansdk-macOS-${VULKAN_SDK_VERSION}.app/Contents/MacOS/vulkansdk-macOS-${VULKAN_SDK_VERSION}" \
+          --root "${HOME}/VulkanSDK/${VULKAN_SDK_VERSION}" \
+          --accept-licenses \
+          --default-answer \
+          --confirm-command install com.lunarg.vulkan.kosmic
+
+        # Clean up
+        rm -rf vulkansdk.zip "vulkansdk-macOS-${VULKAN_SDK_VERSION}.app"
+
+        # Set environment variables for the build
+        echo "VULKAN_SDK=${HOME}/VulkanSDK/${VULKAN_SDK_VERSION}/macOS" >> "$GITHUB_ENV"
     - name: Initialize compiler, library cache
       id: cache
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v4
@@ -109,12 +133,34 @@ jobs:
       run: |
         mkdir dist
         pushd dist
-        for arch in x86_64 arm64; do
-          unzip -o ../xemu-*-${arch}-unsigned.zip
-          mv xemu.app/Contents/MacOS/xemu ../xemu_${arch}
-        done
+
+        # Extract x86_64 build first (base)
+        unzip -o ../xemu-*-x86_64-unsigned.zip
+        mv xemu.app/Contents/MacOS/xemu ../xemu_x86_64
+
+        # Extract arm64 build (this will add Vulkan/KosmicKrisp libraries)
+        unzip -o ../xemu-*-arm64-unsigned.zip
+        mv xemu.app/Contents/MacOS/xemu ../xemu_arm64
+
+        # Create universal binary
         lipo -create -output xemu.app/Contents/MacOS/xemu ../xemu_x86_64 ../xemu_arm64
+
+        # Merge architecture-specific Libraries directories
+        # The x86_64 libraries are in Libraries/x86_64, arm64 in Libraries/arm64
+        # Both should be preserved for the universal build
+
+        # Re-sign the universal binary and all bundled libraries
         codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime --sign - xemu.app/Contents/MacOS/xemu
+
+        # Sign Vulkan libraries if present (arm64 only)
+        if [ -d "xemu.app/Contents/Frameworks" ]; then
+          for lib in xemu.app/Contents/Frameworks/*.dylib; do
+            if [ -f "$lib" ]; then
+              codesign --force --preserve-metadata=entitlements,requirements,flags,runtime --sign - "$lib"
+            fi
+          done
+        fi
+
         popd
     - name: Package
       id: package

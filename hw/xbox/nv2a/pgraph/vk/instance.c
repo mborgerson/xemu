@@ -27,6 +27,10 @@
 
 #include <volk.h>
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+
 #define VkExtensionPropertiesArray GArray
 #define StringArray GArray
 
@@ -37,12 +41,15 @@ static char const *const validation_layers[] = {
 };
 
 static char const *const required_instance_extensions[] = {
-    VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+    // VK_KHR_get_physical_device_properties2 is core in Vulkan 1.1+
+#if HAVE_EXTERNAL_MEMORY
     VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
     VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
+#endif
 };
 
 static char const *const required_device_extensions[] = {
+#if HAVE_EXTERNAL_MEMORY
     VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
     VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
 #ifdef WIN32
@@ -52,6 +59,7 @@ static char const *const required_device_extensions[] = {
     VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
     VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
 #endif
+#endif // HAVE_EXTERNAL_MEMORY
 };
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -98,6 +106,12 @@ static bool check_validation_layer_support(void)
 
 static void create_window(PGRAPHVkState *r, Error **errp)
 {
+#ifdef __APPLE__
+    // On macOS with KosmicKrisp, we do headless rendering without surface support.
+    // Don't create an SDL window with SDL_WINDOW_VULKAN flag as it validates
+    // surface extension support which we don't need for offscreen rendering.
+    r->window = NULL;
+#else
     r->window = SDL_CreateWindow(
         "SDL Offscreen Window",
         640, 480, SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN);
@@ -105,6 +119,7 @@ static void create_window(PGRAPHVkState *r, Error **errp)
     if (r->window == NULL) {
         error_setg(errp, "SDL_CreateWindow failed: %s", SDL_GetError());
     }
+#endif
 }
 
 static void destroy_window(PGRAPHVkState *r)
@@ -150,18 +165,24 @@ is_extension_available(VkExtensionPropertiesArray *available_extensions,
 
 static StringArray *get_required_instance_extension_names(PGRAPHState *pg)
 {
+    StringArray *extensions = g_array_sized_new(
+        FALSE, FALSE, sizeof(char *),
+        ARRAY_SIZE(required_instance_extensions) + 4);
+
+#ifdef __APPLE__
+    // On macOS, we do headless rendering without surfaces.
+    // Don't request surface-related extensions from SDL.
+    (void)pg;
+#else
     // Add instance extensions SDL lists as required
     Uint32 sdl_extension_count = 0;
     const char *const *sdl_extensions =
         SDL_Vulkan_GetInstanceExtensions(&sdl_extension_count);
 
-    StringArray *extensions = g_array_sized_new(
-        FALSE, FALSE, sizeof(char *),
-        sdl_extension_count + ARRAY_SIZE(required_instance_extensions));
-
     if (sdl_extension_count && sdl_extensions) {
         g_array_append_vals(extensions, sdl_extensions, sdl_extension_count);
     }
+#endif
 
     // Add additional required extensions
     g_array_append_vals(extensions, required_instance_extensions,
@@ -198,6 +219,50 @@ add_optional_instance_extension_names(PGRAPHState *pg,
                                    VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 }
 
+#ifdef __APPLE__
+static void setup_macos_vulkan_icd(void)
+{
+    // Set up VK_DRIVER_FILES to point to the bundled KosmicKrisp ICD
+    // The ICD is at <bundle>/Contents/Resources/vulkan/icd.d/kosmickrisp_icd.json
+    char exe_path[PATH_MAX];
+    uint32_t size = sizeof(exe_path);
+
+    if (_NSGetExecutablePath(exe_path, &size) != 0) {
+        fprintf(stderr, "Warning: Failed to get executable path for Vulkan ICD setup\n");
+        return;
+    }
+
+    // Resolve symlinks and get the real path
+    char *real_path = realpath(exe_path, NULL);
+    if (!real_path) {
+        fprintf(stderr, "Warning: Failed to resolve executable path\n");
+        return;
+    }
+
+    // Navigate from <bundle>/Contents/MacOS/xemu to <bundle>/Contents/Resources/vulkan/icd.d/
+    char *last_slash = strrchr(real_path, '/');
+    if (last_slash) {
+        *last_slash = '\0'; // Remove /xemu -> Contents/MacOS
+        last_slash = strrchr(real_path, '/');
+        if (last_slash) {
+            *last_slash = '\0'; // Remove /MacOS -> Contents
+        }
+    }
+
+    char icd_path[PATH_MAX];
+    snprintf(icd_path, sizeof(icd_path), "%s/Resources/vulkan/icd.d/kosmickrisp_icd.json", real_path);
+    free(real_path);
+
+    // Check if the ICD file exists
+    if (access(icd_path, F_OK) == 0) {
+        fprintf(stderr, "Setting VK_DRIVER_FILES=%s\n", icd_path);
+        setenv("VK_DRIVER_FILES", icd_path, 1);
+    } else {
+        fprintf(stderr, "Warning: Bundled Vulkan ICD not found at %s\n", icd_path);
+    }
+}
+#endif
+
 static bool create_instance(PGRAPHState *pg, Error **errp)
 {
     PGRAPHVkState *r = pg->vk_renderer_state;
@@ -207,6 +272,10 @@ static bool create_instance(PGRAPHState *pg, Error **errp)
     if (*errp) {
         return false;
     }
+
+#ifdef __APPLE__
+    setup_macos_vulkan_icd();
+#endif
 
     result = volkInitialize();
     if (result != VK_SUCCESS) {
