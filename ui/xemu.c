@@ -64,6 +64,10 @@
 #define DEBUG_XEMU_C 0
 #endif
 
+#ifndef SDL_HINT_OPENGL_FORCE_SRGB_FRAMEBUFFER
+#define SDL_HINT_OPENGL_FORCE_SRGB_FRAMEBUFFER "SDL_OPENGL_FORCE_SRGB_FRAMEBUFFER"
+#endif
+
 #if DEBUG_XEMU_C
 #define DPRINTF(...) fprintf(stderr, __VA_ARGS__)
 #else
@@ -957,6 +961,10 @@ static void display_very_early_init(DisplayOptions *o)
      * Maybe it's a good idea to fix this in SDL instead.
      */
     setenv("SDL_VIDEODRIVER", "x11", 0);
+#endif
+
+#ifdef _WIN32
+    SDL_SetHint(SDL_HINT_OPENGL_FORCE_SRGB_FRAMEBUFFER, "1");
 #endif
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
