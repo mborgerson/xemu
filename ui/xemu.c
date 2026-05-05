@@ -64,6 +64,7 @@
 #define DEBUG_XEMU_C 0
 #endif
 
+/* introduced in SDL 3.4.2; keep a fallback for older SDL3 headers */
 #ifndef SDL_HINT_OPENGL_FORCE_SRGB_FRAMEBUFFER
 #define SDL_HINT_OPENGL_FORCE_SRGB_FRAMEBUFFER "SDL_OPENGL_FORCE_SRGB_FRAMEBUFFER"
 #endif
