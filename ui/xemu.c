@@ -64,6 +64,11 @@
 #define DEBUG_XEMU_C 0
 #endif
 
+/* introduced in SDL 3.4.2; keep a fallback for older SDL3 headers */
+#ifndef SDL_HINT_OPENGL_FORCE_SRGB_FRAMEBUFFER
+#define SDL_HINT_OPENGL_FORCE_SRGB_FRAMEBUFFER "SDL_OPENGL_FORCE_SRGB_FRAMEBUFFER"
+#endif
+
 #if DEBUG_XEMU_C
 #define DPRINTF(...) fprintf(stderr, __VA_ARGS__)
 #else
@@ -954,6 +959,10 @@ static void display_very_early_init(DisplayOptions *o)
      * [1] https://github.com/libsdl-org/SDL/pull/9383
      */
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "wayland,x11");
+#endif
+
+#ifdef _WIN32
+    SDL_SetHint(SDL_HINT_OPENGL_FORCE_SRGB_FRAMEBUFFER, "1");
 #endif
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
