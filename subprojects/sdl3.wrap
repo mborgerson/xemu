@@ -8,3 +8,6 @@ method = cmake
 
 [provide]
 dependency_names = sdl3
+
+[update]
+tag_regex = ^release-\d+\.\d+\.\d+$
