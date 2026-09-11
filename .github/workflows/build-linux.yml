@@ -159,6 +159,17 @@ jobs:
         dpkg-deb -x libdecor-0-0_*.deb appimage
         dpkg-deb -x libdecor-0-plugin-1-cairo_*.deb appimage
 
+        # libdecor's plugin search path is compiled as an absolute /usr/lib/...
+        # path. Force it to use the Cairo plugin bundled in the AppImage rather
+        # than loading a potentially incompatible plugin from the host.
+        multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+        plugin_dir="appimage/usr/lib/${multiarch}/libdecor/plugins-1"
+        test -f "${plugin_dir}/libdecor-cairo.so"
+        mkdir -p appimage/apprun-hooks
+        cat > appimage/apprun-hooks/libdecor.sh <<EOF
+        export LIBDECOR_PLUGIN_DIR="\${APPDIR}/usr/lib/${multiarch}/libdecor/plugins-1"
+        EOF
+
         ./linuxdeploy-${{ matrix.arch }}.AppImage --output appimage --appdir appimage
     - name: Bundle artifacts
       run: |
